@@ -1,6 +1,8 @@
 # qr_gen
 
-A new Flutter project.
+A Flutter applicatio for generating and sharing QR code for any text you want.
+
+<img src=https://github.com/wmfadel/qr_gen/blob/master/screenshots/Screenshot_1577905075.png width="320"/> 
 
 ## Getting Started
 
