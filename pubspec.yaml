@@ -27,7 +27,8 @@ dependencies:
   flutter_qr_scanner: ^0.1.5
   provider: ^4.0.1
   path_provider: ^1.5.1
-  simple_permissions: ^0.1.9
+  permission_handler: '^4.0.0'
+  esys_flutter_share: ^1.0.2
   
 
 dev_dependencies:

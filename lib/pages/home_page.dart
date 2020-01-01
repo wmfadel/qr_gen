@@ -1,13 +1,12 @@
-import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'package:esys_flutter_share/esys_flutter_share.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:simple_permissions/simple_permissions.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class HomePage extends StatefulWidget {
   static final String routeName = '/';
@@ -18,8 +17,8 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final TextEditingController _dataController = TextEditingController();
-  final FocusNode _focusNode = FocusNode();
   GlobalKey _globalKey = new GlobalKey();
+  var imageBytes;
   bool showQR = false;
 
   @override
@@ -45,7 +44,14 @@ class _HomePageState extends State<HomePage> {
                   maxLines: 5,
                   minLines: 1,
                   autofocus: true,
-                  focusNode: _focusNode,
+                  textInputAction: TextInputAction.go,
+                  onSubmitted: (_) {
+                    // close the keyboard
+                    FocusScope.of(context).requestFocus(FocusNode());
+                    setState(() {
+                      showQR = true;
+                    });
+                  },
                   decoration: InputDecoration(
                       hintText: 'Qr Data',
                       suffixIcon: IconButton(
@@ -100,7 +106,12 @@ class _HomePageState extends State<HomePage> {
                               Icons.share,
                               color: Colors.blueAccent,
                             ),
-                            onPressed: () {},
+                            onPressed: () async {
+                              var imagePath = await _capturePng();
+                              await Share.file(
+                                  'Qr-Gen', imagePath, imageBytes, 'image/png',
+                                  text: 'My Qr Code.');
+                            },
                           ),
                           IconButton(
                             icon: Icon(
@@ -117,7 +128,7 @@ class _HomePageState extends State<HomePage> {
                               color: Colors.blueAccent,
                             ),
                             onPressed: () {
-                              FocusScope.of(context).requestFocus(_focusNode);
+                              _dataController.text = '';
                               setState(() {
                                 showQR = false;
                               });
@@ -142,21 +153,32 @@ class _HomePageState extends State<HomePage> {
       ByteData byteData =
           await image.toByteData(format: ui.ImageByteFormat.png);
       var pngBytes = byteData.buffer.asUint8List();
-
+      print('getting permissions');
       // saving image to device
-      PermissionStatus permissionResult =
-          await SimplePermissions.requestPermission(
-              Permission.WriteExternalStorage);
-      if (permissionResult == PermissionStatus.authorized) {
-        Directory directory = await getApplicationDocumentsDirectory();
-        String path = directory.path;
-        print('image path: $path');
+      PermissionStatus permission = await PermissionHandler()
+          .checkPermissionStatus(PermissionGroup.storage);
 
-        await Directory('$path/qr_gen').create(recursive: true);
+      if (permission == PermissionStatus.disabled ||
+          permission == PermissionStatus.restricted ||
+          permission == PermissionStatus.unknown ||
+          permission == PermissionStatus.denied) {
+        await PermissionHandler().requestPermissions([PermissionGroup.storage]);
 
-        File('$path/gr_gen/${DateTime.now().toUtc().toIso8601String()}.png')
-            .writeAsBytesSync(pngBytes.buffer.asInt8List());
+        await PermissionHandler()
+            .checkPermissionStatus(PermissionGroup.storage);
       }
+
+      Directory directory = await getExternalStorageDirectory();
+      String path = directory.path;
+      print('image path: $path');
+
+      await Directory('$path/qr_gen').create(recursive: true);
+
+      imageBytes = pngBytes.buffer.asInt8List();
+      String imagePath = '$path/gr_gen-${_dataController.text}.png';
+      File(imagePath)..writeAsBytesSync(imageBytes, mode: FileMode.write);
+
+      return imagePath;
     } catch (e) {
       print(e);
     }
